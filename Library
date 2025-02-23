@@ -3,9 +3,7 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
 local DayYield = {}
--- Default style; can be changed via DayYield:SetTheme(newTheme)
 DayYield.Style = {
 	BackgroundColor = Color3.fromRGB(30, 30, 30),
 	AccentColor = Color3.fromRGB(0, 170, 255),
@@ -14,28 +12,22 @@ DayYield.Style = {
 	TabColor = Color3.fromRGB(40, 40, 40),
 	NotificationColor = Color3.fromRGB(50, 50, 50),
 }
-
--- Allow users to change the theme
 function DayYield:SetTheme(newTheme)
 	for key, value in pairs(newTheme) do
 		self.Style[key] = value
 	end
 end
-
 local function applyUICorner(object, radius)
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, radius)
 	corner.Parent = object
 end
-
 local function applyUIStroke(object, thickness, color)
 	local stroke = Instance.new("UIStroke")
 	stroke.Thickness = thickness
 	stroke.Color = color
 	stroke.Parent = object
 end
-
--- Makes a frame draggable.
 local function makeDraggable(frame)
 	local dragging = false
 	local dragInput, dragStart, startPos
@@ -63,14 +55,11 @@ local function makeDraggable(frame)
 		end
 	end)
 end
-
--- CreateWindow creates the main ScreenGui and window frame.
 function DayYield:CreateWindow(options)
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = options.Name or "DayYieldWindow"
 	screenGui.Parent = PlayerGui
 	screenGui.ResetOnSpawn = false
-
 	local window = Instance.new("Frame")
 	window.Size = options.Size or UDim2.new(0, 400, 0, 300)
 	window.Position = options.Position or UDim2.new(0.5, -200, 0.5, -150)
@@ -79,7 +68,6 @@ function DayYield:CreateWindow(options)
 	window.Parent = screenGui
 	applyUICorner(window, 10)
 	applyUIStroke(window, 2, DayYield.Style.AccentColor)
-
 	local titleLabel = Instance.new("TextLabel")
 	titleLabel.Text = options.Title or "DayYield UI"
 	titleLabel.Font = Enum.Font.GothamBold
@@ -88,30 +76,23 @@ function DayYield:CreateWindow(options)
 	titleLabel.Size = UDim2.new(1, 0, 0, 40)
 	titleLabel.BackgroundTransparency = 1
 	titleLabel.Parent = window
-
 	local tabHolder = Instance.new("Frame")
 	tabHolder.Size = UDim2.new(1, 0, 0, 40)
 	tabHolder.Position = UDim2.new(0, 0, 0, 40)
 	tabHolder.BackgroundColor3 = (options.Theme and options.Theme.TabColor) or DayYield.Style.TabColor
 	tabHolder.Parent = window
 	applyUICorner(tabHolder, 8)
-
 	local contentHolder = Instance.new("Frame")
 	contentHolder.Size = UDim2.new(1, -20, 1, -90)
 	contentHolder.Position = UDim2.new(0, 10, 0, 90)
 	contentHolder.BackgroundTransparency = 1
 	contentHolder.Parent = window
-
-	-- Make the window draggable.
 	makeDraggable(window)
-
 	local winObject = {}
 	winObject.ScreenGui = screenGui
 	winObject.Main = window
 	winObject.TabHolder = tabHolder
 	winObject.ContentHolder = contentHolder
-
-	-- Create a new tab; each tab gets its own content container.
 	function winObject:CreateTab(tabOptions)
 		local tabButton = Instance.new("TextButton")
 		tabButton.Text = tabOptions.Name or "Tab"
@@ -122,18 +103,14 @@ function DayYield:CreateWindow(options)
 		tabButton.Size = UDim2.new(0, 100, 0, 30)
 		tabButton.Parent = self.TabHolder
 		applyUICorner(tabButton, 6)
-
 		local tabContent = Instance.new("Frame")
 		tabContent.Size = UDim2.new(1, 0, 1, 0)
 		tabContent.BackgroundTransparency = 1
 		tabContent.Parent = self.ContentHolder
 		tabContent.Visible = false
-
 		local tabObject = {}
 		tabObject.Button = tabButton
 		tabObject.Content = tabContent
-
-		-- Create a button in this tab.
 		function tabObject:CreateButton(btnOptions)
 			local button = Instance.new("TextButton")
 			button.Text = btnOptions.Text or "Button"
@@ -147,8 +124,6 @@ function DayYield:CreateWindow(options)
 			applyUICorner(button, 6)
 			button.MouseButton1Click:Connect(btnOptions.Callback or function() end)
 		end
-
-		-- Create a toggle in this tab.
 		function tabObject:CreateToggle(togOptions)
 			local toggle = Instance.new("TextButton")
 			toggle.Text = togOptions.Text or "Toggle"
@@ -167,7 +142,6 @@ function DayYield:CreateWindow(options)
 				togOptions.Callback(state)
 			end)
 		end
-
 		tabButton.MouseButton1Click:Connect(function()
 			for _, child in pairs(self.Parent:GetChildren()) do
 				if child:IsA("Frame") then
@@ -176,24 +150,28 @@ function DayYield:CreateWindow(options)
 			end
 			tabContent.Visible = true
 		end)
-
 		return tabObject
 	end
-
-	-- Bind a key (e.g., "K") to toggle the window's visibility.
 	function winObject:BindToggle(key)
 		key = key:upper()
 		UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			if gameProcessed then return end
 			if input.KeyCode == Enum.KeyCode[key] then
-				self.Main.Visible = not self.Main.Visible
-				local vis = self.Main.Visible and "Visible" or "Hidden"
-				self:Notify({Title = "Interface", Message = "Interface is now " .. vis, Duration = 2})
+				if self.Main.Visible then
+					local tween = TweenService:Create(self.Main, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+					tween:Play()
+					tween.Completed:Wait()
+					self.Main.Visible = false
+					self:Notify({Title = "Interface", Message = "Interface is now Hidden", Duration = 2})
+				else
+					self.Main.Visible = true
+					local tween = TweenService:Create(self.Main, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0})
+					tween:Play()
+					self:Notify({Title = "Interface", Message = "Interface is now Visible", Duration = 2})
+				end
 			end
 		end)
 	end
-
-	-- Bind any key to an arbitrary callback.
 	function winObject:BindKey(key, callback)
 		key = key:upper()
 		UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -203,8 +181,6 @@ function DayYield:CreateWindow(options)
 			end
 		end)
 	end
-
-	-- Notification function using Tween for fade-out.
 	function winObject:Notify(notifOptions)
 		local notif = Instance.new("TextLabel")
 		notif.Text = (notifOptions.Title or "Notification") .. "\n" .. (notifOptions.Message or "")
@@ -213,12 +189,11 @@ function DayYield:CreateWindow(options)
 		notif.TextColor3 = DayYield.Style.TextColor
 		notif.BackgroundColor3 = DayYield.Style.NotificationColor
 		notif.Size = notifOptions.Size or UDim2.new(0, 250, 0, 60)
-		notif.Position = notifOptions.Position or UDim2.new(0.5, -125, 0.8, 0)
-		notif.Parent = self.ScreenGui
+		notif.Position = notifOptions.Position or UDim2.new(1, -260, 0, 100)
+		notif.Parent = self.ScreenGui or PlayerGui:FindFirstChild("DayYieldWindow")
 		applyUICorner(notif, 8)
 		notif.BackgroundTransparency = 0
-		local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		local tween = TweenService:Create(notif, tweenInfo, {BackgroundTransparency = 1})
+		local tween = TweenService:Create(notif, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
 		task.spawn(function()
 			task.wait(notifOptions.Duration or 3)
 			tween:Play()
@@ -226,8 +201,6 @@ function DayYield:CreateWindow(options)
 			notif:Destroy()
 		end)
 	end
-
 	return winObject
 end
-
 return DayYield
