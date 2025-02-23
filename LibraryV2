@@ -1,365 +1,244 @@
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+-- Load the Day Yield Library
+local DayYield = loadstring(game:HttpGet("https://raw.githubusercontent.com/alexsssszzzz/DayYield/refs/heads/main/LibraryV2"))()
 
-local DayYield = {Keys = {}, ActiveKeys = {}, Windows = {}}
+-- Create a window
+local Window = DayYield:CreateWindow({
+    Title = "Day Yield Library [ALPHA]"
+})
 
-DayYield.Themes = {
-	EldenTheme = {
-		BackgroundColor = Color3.fromRGB(15, 15, 18),
-		SidebarColor = Color3.fromRGB(10, 10, 12),
-		AccentColor = Color3.fromRGB(180, 155, 95),
-		TextColor = Color3.fromRGB(225, 220, 210),
-		SubTextColor = Color3.fromRGB(160, 155, 145),
-		ElementColor = Color3.fromRGB(25, 25, 30),
-		BorderColor = Color3.fromRGB(45, 40, 35),
-		NotificationColor = Color3.fromRGB(20, 20, 25),
-		GoldAccent = Color3.fromRGB(205, 175, 115)
-	}
-}
+-- Add tabs
+local GeneralTab = Window:CreateTab("General")
+local ESPTab = Window:CreateTab("ESP")
 
-DayYield.Style = table.clone(DayYield.Themes.EldenTheme)
+-- Variables for fly, aimbot, and infinite jump
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+local userInputService = game:GetService("UserInputService")
+local runService = game:GetService("RunService")
+local camera = workspace.CurrentCamera
 
--- Detect device type
-local deviceType
-if UserInputService.TouchEnabled then
-	deviceType = "Mobile"
-elseif UserInputService.GamepadEnabled then
-	deviceType = "Console"
-else
-	deviceType = "Desktop"
+local flying = false
+local aimbotEnabled = false
+local infiniteJump = false
+
+-- Improved Fly Logic
+GeneralTab:CreateButton({
+    Name = "Fly",
+    Callback = function()
+        flying = not flying
+        if flying then
+            DayYield:Notify("Fly", "Flying has been activated!", 3)
+            humanoid:ChangeState(Enum.HumanoidStateType.Flying)
+            local bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            bodyVelocity.MaxForce = Vector3.new(0, 0, 0)
+            bodyVelocity.Parent = rootPart
+
+            local flyConnection
+            flyConnection = runService.Stepped:Connect(function()
+                if not flying then
+                    bodyVelocity:Destroy()
+                    flyConnection:Disconnect()
+                    return
+                end
+
+                local direction = Vector3.new()
+                if userInputService:IsKeyDown(Enum.KeyCode.W) then
+                    direction = direction + camera.CFrame.LookVector
+                end
+                if userInputService:IsKeyDown(Enum.KeyCode.S) then
+                    direction = direction - camera.CFrame.LookVector
+                end
+                if userInputService:IsKeyDown(Enum.KeyCode.A) then
+                    direction = direction - camera.CFrame.RightVector
+                end
+                if userInputService:IsKeyDown(Enum.KeyCode.D) then
+                    direction = direction + camera.CFrame.RightVector
+                end
+                if userInputService:IsKeyDown(Enum.KeyCode.Space) then
+                    direction = direction + Vector3.new(0, 1, 0)
+                end
+                if userInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+                    direction = direction - Vector3.new(0, 1, 0)
+                end
+
+                bodyVelocity.Velocity = direction * 50
+            end)
+        else
+            DayYield:Notify("Fly", "Flying has been deactivated!", 3)
+            humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+        end
+    end
+})
+
+-- Infinite Jump Logic
+GeneralTab:CreateToggle({
+    Name = "Infinite Jump",
+    Callback = function(state)
+        infiniteJump = state
+        DayYield:Notify("Infinite Jump", state and "Enabled" or "Disabled", 3)
+        if infiniteJump then
+            userInputService.JumpRequest:Connect(function()
+                if infiniteJump then
+                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
+            end)
+        end
+    end
+})
+
+-- Aimbot Logic
+local function findClosestPlayer()
+    local closestPlayer = nil
+    local closestDistance = math.huge
+
+    for _, player in pairs(game.Players:GetPlayers()) do
+        if player ~= game.Players.LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            -- Team check
+            if player.Team ~= game.Players.LocalPlayer.Team then
+                local distance = (player.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude
+                if distance < closestDistance then
+                    closestDistance = distance
+                    closestPlayer = player
+                end
+            end
+        end
+    end
+
+    return closestPlayer
 end
-print("Running on:", deviceType)
 
--- Auto-scaling function
-local function scaleUI(element)
-	local screenSize = workspace.CurrentCamera.ViewportSize
-	if deviceType == "Mobile" then
-		element.Size = UDim2.new(0.8, 0, 0.8, 0)
-		element.Position = UDim2.new(0.1, 0, 0.1, 0)
-	else
-		element.Size = UDim2.new(0.4, 0, 0.6, 0)
-		element.Position = UDim2.new(0.3, 0, 0.2, 0)
-	end
-end
+userInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Q then
+        aimbotEnabled = true
+        DayYield:Notify("Aimbot", "Aimbot activated! Hold Q to aim.", 3)
 
-function DayYield:Notify(title, message, duration)
-	duration = duration or 5
+        while aimbotEnabled and userInputService:IsKeyDown(Enum.KeyCode.Q) do
+            local target = findClosestPlayer()
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                camera.CFrame = CFrame.new(camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
+            end
+            runService.RenderStepped:Wait()
+        end
 
-	local notification = Instance.new("Frame")
-	notification.Size = UDim2.new(0, 300, 0, 60)
-	notification.Position = UDim2.new(1, -320, 1, -80)
-	notification.BackgroundColor3 = DayYield.Style.NotificationColor
-	notification.BorderSizePixel = 0
-	notification.Parent = PlayerGui
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = notification
-
-	local titleLabel = Instance.new("TextLabel")
-	titleLabel.Text = title
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.TextColor3 = DayYield.Style.GoldAccent
-	titleLabel.TextSize = 14
-	titleLabel.Size = UDim2.new(1, -20, 0, 20)
-	titleLabel.Position = UDim2.new(0, 10, 0, 5)
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.Parent = notification
-
-	local messageLabel = Instance.new("TextLabel")
-	messageLabel.Text = message
-	messageLabel.Font = Enum.Font.Gotham
-	messageLabel.TextColor3 = DayYield.Style.TextColor
-	messageLabel.TextSize = 12
-	messageLabel.Size = UDim2.new(1, -20, 1, -30)
-	messageLabel.Position = UDim2.new(0, 10, 0, 25)
-	messageLabel.BackgroundTransparency = 1
-	messageLabel.Parent = notification
-
-	notification.Position = UDim2.new(1, -320, 1, 100)
-	TweenService:Create(notification, TweenInfo.new(0.3), {
-		Position = UDim2.new(1, -320, 1, -80)
-	}):Play()
-
-	task.delay(duration, function()
-		TweenService:Create(notification, TweenInfo.new(0.3), {
-			Position = UDim2.new(1, -320, 1, 100)
-		}):Play()
-		task.wait(0.3)
-		notification:Destroy()
-	end)
-end
-
--- Loading Screen
-local loadingScreen = Instance.new("ScreenGui")
-loadingScreen.Name = "LoadingScreen"
-loadingScreen.Parent = PlayerGui
-loadingScreen.ResetOnSpawn = false
-
-local loadingFrame = Instance.new("Frame")
-loadingFrame.Size = UDim2.new(1, 0, 1, 0)
-loadingFrame.BackgroundColor3 = DayYield.Style.BackgroundColor
-loadingFrame.Parent = loadingScreen
-
-local loadingText = Instance.new("TextLabel")
-loadingText.Text = "Loading Day Yield Library..."
-loadingText.Font = Enum.Font.GothamBold
-loadingText.TextColor3 = DayYield.Style.GoldAccent
-loadingText.TextSize = 20
-loadingText.Size = UDim2.new(1, 0, 0, 50)
-loadingText.Position = UDim2.new(0, 0, 0.5, -25)
-loadingText.BackgroundTransparency = 1
-loadingText.Parent = loadingFrame
-
--- Simulate loading
-task.delay(2, function()
-	TweenService:Create(loadingFrame, TweenInfo.new(0.5), {
-		BackgroundTransparency = 1
-	}):Play()
-	task.wait(0.5)
-	loadingScreen:Destroy()
+        aimbotEnabled = false
+        DayYield:Notify("Aimbot", "Aimbot deactivated.", 3)
+    end
 end)
 
-function DayYield:CreateWindow(config)
-	local window = {}
-	local gui = Instance.new("ScreenGui")
-	local mainFrame = Instance.new("Frame")
-	local titleBar = Instance.new("Frame")
-	local sidebar = Instance.new("Frame")
-	local decoration = Instance.new("Frame")
-	local contentFrame = Instance.new("Frame")
+-- ESP Features
+local espEnabled = false
+local espObjects = {}
 
-	gui.Name = "DayYieldElden"
-	gui.Parent = PlayerGui
-	gui.ResetOnSpawn = false
+local function createESP(player)
+    local character = player.Character
+    if not character then return end
 
-	-- Auto-scale the main frame
-	scaleUI(mainFrame)
-	mainFrame.BackgroundColor3 = DayYield.Style.BackgroundColor
-	mainFrame.Parent = gui
+    -- Box ESP
+    local box = Instance.new("BoxHandleAdornment")
+    box.Size = character:GetExtentsSize()
+    box.Adornee = character
+    box.AlwaysOnTop = true
+    box.ZIndex = 10
+    box.Transparency = 0.5
+    box.Color3 = Color3.new(1, 0, 0)
+    box.Parent = character
 
-	local mainBorder = Instance.new("UIStroke")
-	mainBorder.Color = DayYield.Style.BorderColor
-	mainBorder.Thickness = 1.5
-	mainBorder.Parent = mainFrame
+    -- Name ESP
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Text = player.Name
+    nameLabel.Size = UDim2.new(0, 100, 0, 20)
+    nameLabel.Position = UDim2.new(0, 0, 0, -20)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.new(1, 1, 1)
+    nameLabel.Parent = box
 
-	titleBar.Name = "TitleBar"
-	titleBar.Size = UDim2.new(1, 0, 0, 40)
-	titleBar.BackgroundColor3 = DayYield.Style.SidebarColor
-	titleBar.Parent = mainFrame
+    -- Health ESP
+    local healthLabel = Instance.new("TextLabel")
+    healthLabel.Text = "Health: " .. player.Character.Humanoid.Health
+    healthLabel.Size = UDim2.new(0, 100, 0, 20)
+    healthLabel.Position = UDim2.new(0, 0, 0, -40)
+    healthLabel.BackgroundTransparency = 1
+    healthLabel.TextColor3 = Color3.new(1, 1, 1)
+    healthLabel.Parent = box
 
-	local titleText = Instance.new("TextLabel")
-	titleText.Text = config.Title or "DayYield"
-	titleText.Font = Enum.Font.GothamBold
-	titleText.TextColor3 = DayYield.Style.GoldAccent
-	titleText.TextSize = 20
-	titleText.Size = UDim2.new(1, 0, 1, 0)
-	titleText.BackgroundTransparency = 1
-	titleText.Parent = titleBar
+    -- Distance ESP
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Text = "Distance: " .. math.floor((player.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude)
+    distanceLabel.Size = UDim2.new(0, 100, 0, 20)
+    distanceLabel.Position = UDim2.new(0, 0, 0, -60)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.TextColor3 = Color3.new(1, 1, 1)
+    distanceLabel.Parent = box
 
-	sidebar.Name = "Sidebar"
-	sidebar.Size = UDim2.new(0, 220, 1, -40)
-	sidebar.Position = UDim2.new(0, 0, 0, 40)
-	sidebar.BackgroundColor3 = DayYield.Style.SidebarColor
-	sidebar.Parent = mainFrame
+    -- Skeleton ESP
+    local function drawLine(part1, part2)
+        local line = Instance.new("LineHandleAdornment")
+        line.Length = (part1.Position - part2.Position).Magnitude
+        line.Thickness = 2
+        line.Color3 = Color3.new(1, 0, 0)
+        line.Adornee = part1
+        line.CFrame = CFrame.new(part1.Position, part2.Position)
+        line.Parent = part1
+    end
 
-	decoration.Name = "Decoration"
-	decoration.Size = UDim2.new(1, 0, 0, 2)
-	decoration.Position = UDim2.new(0, 0, 0, 0)
-	decoration.BackgroundColor3 = DayYield.Style.GoldAccent
-	decoration.Parent = sidebar
+    local parts = {
+        character:FindFirstChild("Head"),
+        character:FindFirstChild("Torso"),
+        character:FindFirstChild("Left Arm"),
+        character:FindFirstChild("Right Arm"),
+        character:FindFirstChild("Left Leg"),
+        character:FindFirstChild("Right Leg")
+    }
 
-	local tabContainer = Instance.new("ScrollingFrame")
-	tabContainer.Name = "TabContainer"
-	tabContainer.Size = UDim2.new(1, -20, 1, -20)
-	tabContainer.Position = UDim2.new(0, 10, 0, 10)
-	tabContainer.BackgroundTransparency = 1
-	tabContainer.ScrollBarThickness = 2
-	tabContainer.ScrollBarImageColor3 = DayYield.Style.GoldAccent
-	tabContainer.Parent = sidebar
+    for i = 1, #parts do
+        for j = i + 1, #parts do
+            if parts[i] and parts[j] then
+                drawLine(parts[i], parts[j])
+            end
+        end
+    end
 
-	local tabList = Instance.new("UIListLayout")
-	tabList.Parent = tabContainer
-	tabList.SortOrder = Enum.SortOrder.LayoutOrder
-	tabList.Padding = UDim.new(0, 8)
-
-	contentFrame.Name = "ContentFrame"
-	contentFrame.Size = UDim2.new(1, -240, 1, -60)
-	contentFrame.Position = UDim2.new(0, 230, 0, 50)
-	contentFrame.BackgroundTransparency = 1
-	contentFrame.Parent = mainFrame
-
-	local function createTabButton(name)
-		local button = Instance.new("TextButton")
-		button.Size = UDim2.new(1, 0, 0, 35)
-		button.BackgroundColor3 = DayYield.Style.ElementColor
-		button.Text = name
-		button.TextColor3 = DayYield.Style.TextColor
-		button.TextSize = 14
-		button.Font = Enum.Font.GothamSemibold
-
-		local buttonBorder = Instance.new("UIStroke")
-		buttonBorder.Color = DayYield.Style.BorderColor
-		buttonBorder.Thickness = 1
-		buttonBorder.Parent = button
-
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0, 4)
-		corner.Parent = button
-
-		local padding = Instance.new("UIPadding")
-		padding.PaddingLeft = UDim.new(0, 15)
-		padding.Parent = button
-
-		return button
-	end
-
-	function window:CreateTab(name)
-		local tab = {}
-		local tabButton = createTabButton(name)
-		local tabContent = Instance.new("ScrollingFrame")
-
-		tabButton.Parent = tabContainer
-
-		tabContent.Name = name.."Content"
-		tabContent.Size = UDim2.new(1, 0, 1, 0)
-		tabContent.BackgroundTransparency = 1
-		tabContent.ScrollBarThickness = 2
-		tabContent.ScrollBarImageColor3 = DayYield.Style.GoldAccent
-		tabContent.Visible = false
-		tabContent.Parent = contentFrame
-
-		local elementList = Instance.new("UIListLayout")
-		elementList.Parent = tabContent
-		elementList.SortOrder = Enum.SortOrder.LayoutOrder
-		elementList.Padding = UDim.new(0, 10)
-
-		local function createButton(config)
-			local button = Instance.new("TextButton")
-			button.Size = UDim2.new(1, -20, 0, 40)
-			button.Position = UDim2.new(0, 10, 0, 0)
-			button.BackgroundColor3 = DayYield.Style.ElementColor
-			button.Text = config.Name
-			button.TextColor3 = DayYield.Style.TextColor
-			button.TextSize = 14
-			button.Font = Enum.Font.GothamSemibold
-
-			local buttonBorder = Instance.new("UIStroke")
-			buttonBorder.Color = DayYield.Style.BorderColor
-			buttonBorder.Thickness = 1
-			buttonBorder.Parent = button
-
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0, 4)
-			corner.Parent = button
-
-			button.MouseEnter:Connect(function()
-				TweenService:Create(button, TweenInfo.new(0.2), {
-					BackgroundColor3 = DayYield.Style.AccentColor
-				}):Play()
-			end)
-
-			button.MouseLeave:Connect(function()
-				TweenService:Create(button, TweenInfo.new(0.2), {
-					BackgroundColor3 = DayYield.Style.ElementColor
-				}):Play()
-			end)
-
-			return button
-		end
-
-		function tab:CreateButton(config)
-			local button = createButton(config)
-			button.Parent = tabContent
-
-			button.MouseButton1Click:Connect(function()
-				config.Callback()
-			end)
-		end
-
-		function tab:CreateToggle(config)
-			local toggleButton = createButton(config)
-			toggleButton.Parent = tabContent
-
-			local toggleState = false
-			local indicator = Instance.new("Frame")
-			indicator.Size = UDim2.new(0, 20, 0, 20)
-			indicator.Position = UDim2.new(1, -30, 0.5, -10)
-			indicator.BackgroundColor3 = DayYield.Style.ElementColor
-			indicator.Parent = toggleButton
-
-			local indicatorBorder = Instance.new("UIStroke")
-			indicatorBorder.Color = DayYield.Style.BorderColor
-			indicatorBorder.Thickness = 1
-			indicatorBorder.Parent = indicator
-
-			Instance.new("UICorner", indicator).CornerRadius = UDim.new(0, 4)
-
-			toggleButton.MouseButton1Click:Connect(function()
-				toggleState = not toggleState
-				local targetColor = toggleState and DayYield.Style.GoldAccent or DayYield.Style.ElementColor
-				TweenService:Create(indicator, TweenInfo.new(0.2), {
-					BackgroundColor3 = targetColor
-				}):Play()
-				config.Callback(toggleState)
-			end)
-		end
-
-		tabButton.MouseButton1Click:Connect(function()
-			for _, child in ipairs(contentFrame:GetChildren()) do
-				if child:IsA("ScrollingFrame") then
-					child.Visible = false
-				end
-			end
-			tabContent.Visible = true
-		end)
-
-		return tab
-	end
-
-	local dragging, dragInput, dragStart, startPos
-
-	titleBar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
-			dragStart = input.Position
-			startPos = mainFrame.Position
-		end
-	end)
-
-	titleBar.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = false
-		end
-	end)
-
-	UserInputService.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
-			local delta = input.Position - dragStart
-			mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-		end
-	end)
-
-	Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
-	Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 8)
-	Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 8)
-
-	-- Keybind (K) to toggle UI
-	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if input.KeyCode == Enum.KeyCode.K then
-			gui.Enabled = not gui.Enabled
-			TweenService:Create(mainFrame, TweenInfo.new(0.3), {
-				Position = gui.Enabled and UDim2.new(0.3, 0, 0.2, 0) or UDim2.new(0.3, 0, -1, 0)
-			}):Play()
-		end
-	end)
-
-	return window
+    espObjects[player] = box
 end
 
-return DayYield
+local function removeESP(player)
+    if espObjects[player] then
+        espObjects[player]:Destroy()
+        espObjects[player] = nil
+    end
+end
+
+ESPTab:CreateToggle({
+    Name = "ESP",
+    Callback = function(state)
+        espEnabled = state
+        DayYield:Notify("ESP", state and "Enabled" or "Disabled", 3)
+
+        if espEnabled then
+            for _, player in pairs(game.Players:GetPlayers()) do
+                if player ~= game.Players.LocalPlayer then
+                    createESP(player)
+                end
+            end
+
+            game.Players.PlayerAdded:Connect(function(player)
+                if espEnabled then
+                    createESP(player)
+                end
+            end)
+
+            game.Players.PlayerRemoving:Connect(function(player)
+                removeESP(player)
+            end)
+        else
+            for player, espObject in pairs(espObjects) do
+                espObject:Destroy()
+                espObjects[player] = nil
+            end
+        end
+    end
+})
