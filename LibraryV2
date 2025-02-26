@@ -1,7 +1,7 @@
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -18,141 +18,56 @@ DayYield.Themes = {
 		BorderColor = Color3.fromRGB(45, 40, 35),
 		NotificationColor = Color3.fromRGB(20, 20, 25),
 		GoldAccent = Color3.fromRGB(205, 175, 115)
+	},
+	DarkTheme = {
+		BackgroundColor = Color3.fromRGB(30, 30, 30),
+		SidebarColor = Color3.fromRGB(20, 20, 20),
+		AccentColor = Color3.fromRGB(0, 122, 204),
+		TextColor = Color3.fromRGB(255, 255, 255),
+		SubTextColor = Color3.fromRGB(180, 180, 180),
+		ElementColor = Color3.fromRGB(50, 50, 50),
+		BorderColor = Color3.fromRGB(80, 80, 80),
+		NotificationColor = Color3.fromRGB(40, 40, 40),
+		GoldAccent = Color3.fromRGB(255, 215, 0)
+	},
+	LightTheme = {
+		BackgroundColor = Color3.fromRGB(255, 255, 255),
+		SidebarColor = Color3.fromRGB(240, 240, 240),
+		AccentColor = Color3.fromRGB(0, 122, 204),
+		TextColor = Color3.fromRGB(0, 0, 0),
+		SubTextColor = Color3.fromRGB(100, 100, 100),
+		ElementColor = Color3.fromRGB(230, 230, 230),
+		BorderColor = Color3.fromRGB(200, 200, 200),
+		NotificationColor = Color3.fromRGB(220, 220, 220),
+		GoldAccent = Color3.fromRGB(255, 223, 0)
 	}
 }
 
 DayYield.Style = table.clone(DayYield.Themes.EldenTheme)
 
--- Detect device type
-local deviceType
-if UserInputService.TouchEnabled then
-	deviceType = "Mobile"
-elseif UserInputService.GamepadEnabled then
-	deviceType = "Console"
-else
-	deviceType = "Desktop"
-end
-print("Running on:", deviceType)
-
--- Auto-scaling function
-local function scaleUI(element)
-	local screenSize = workspace.CurrentCamera.ViewportSize
-	if deviceType == "Mobile" then
-		element.Size = UDim2.new(0.8, 0, 0.8, 0)
-		element.Position = UDim2.new(0.1, 0, 0.1, 0)
-	else
-		element.Size = UDim2.new(0.4, 0, 0.6, 0)
-		element.Position = UDim2.new(0.3, 0, 0.2, 0)
-	end
-end
-
--- CreateKeybind function
-function DayYield:CreateKeybind(config)
-	local keybind = {
-		Key = config.Key or Enum.KeyCode.Unknown,
-		Callback = config.Callback or function() end,
-		Description = config.Description or "No description provided."
-	}
-
-	-- Store the keybind in the ActiveKeys table
-	table.insert(DayYield.ActiveKeys, keybind)
-
-	-- Listen for the key press
-	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if input.KeyCode == keybind.Key then
-			keybind.Callback()
-		end
-	end)
-
-	return keybind
-end
-
-function DayYield:Notify(title, message, duration)
-	duration = duration or 5
-
-	local notification = Instance.new("Frame")
-	notification.Size = UDim2.new(0, 300, 0, 60)
-	notification.Position = UDim2.new(1, -320, 1, -80)
+-- Notification function
+function DayYield:Notify(message, duration)
+	duration = duration or 3
+	local notification = Instance.new("TextLabel")
+	notification.Size = UDim2.new(0, 300, 0, 50)
+	notification.Position = UDim2.new(0.5, -150, 0, -50)
 	notification.BackgroundColor3 = DayYield.Style.NotificationColor
-	notification.BorderSizePixel = 0
+	notification.TextColor3 = DayYield.Style.TextColor
+	notification.TextScaled = true
+	notification.Font = Enum.Font.GothamBold
+	notification.Text = message
 	notification.Parent = PlayerGui
+	notification.AnchorPoint = Vector2.new(0.5, 0)
+	notification.Visible = true
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = notification
+	local notificationCorner = Instance.new("UICorner")
+	notificationCorner.CornerRadius = UDim.new(0, 8)
+	notificationCorner.Parent = notification
 
-	local titleLabel = Instance.new("TextLabel")
-	titleLabel.Text = title
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.TextColor3 = DayYield.Style.GoldAccent
-	titleLabel.TextSize = 14
-	titleLabel.Size = UDim2.new(1, -20, 0, 20)
-	titleLabel.Position = UDim2.new(0, 10, 0, 5)
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.Parent = notification
-
-	local messageLabel = Instance.new("TextLabel")
-	messageLabel.Text = message
-	messageLabel.Font = Enum.Font.Gotham
-	messageLabel.TextColor3 = DayYield.Style.TextColor
-	messageLabel.TextSize = 12
-	messageLabel.Size = UDim2.new(1, -20, 1, -30)
-	messageLabel.Position = UDim2.new(0, 10, 0, 25)
-	messageLabel.BackgroundTransparency = 1
-	messageLabel.Parent = notification
-
-	notification.Position = UDim2.new(1, -320, 1, 100)
-	TweenService:Create(notification, TweenInfo.new(0.3), {
-		Position = UDim2.new(1, -320, 1, -80)
-	}):Play()
-
-	task.delay(duration, function()
-		TweenService:Create(notification, TweenInfo.new(0.3), {
-			Position = UDim2.new(1, -320, 1, 100)
-		}):Play()
-		task.wait(0.3)
-		notification:Destroy()
-	end)
+	-- Tween to fade out notification
+	TweenService:Create(notification, TweenInfo.new(duration), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
+	game:GetService("Debris"):AddItem(notification, duration + 0.5)
 end
-
--- Loading Screen
-local loadingScreen = Instance.new("ScreenGui")
-loadingScreen.Name = "LoadingScreen"
-loadingScreen.Parent = PlayerGui
-loadingScreen.ResetOnSpawn = false
-
-local loadingFrame = Instance.new("Frame")
-loadingFrame.Size = UDim2.new(1, 0, 1, 0)
-loadingFrame.BackgroundTransparency = 1
-loadingFrame.Parent = loadingScreen
-
-local loadingText = Instance.new("TextLabel")
-loadingText.Text = "DayYield..."
-loadingText.Font = Enum.Font.GothamBold
-loadingText.TextColor3 = DayYield.Style.GoldAccent
-loadingText.TextSize = 20
-loadingText.Size = UDim2.new(1, 0, 0, 50)
-loadingText.Position = UDim2.new(0, 0, 0.5, -25)
-loadingText.BackgroundTransparency = 1
-loadingText.Parent = loadingFrame
-
--- Rotate the text
-local rotationSpeed = 1
-local rotationConnection
-rotationConnection = RunService.RenderStepped:Connect(function(deltaTime)
-	loadingText.Rotation = loadingText.Rotation + rotationSpeed * deltaTime * 60
-end)
-
--- Simulate loading
-task.delay(2, function()
-	rotationConnection:Disconnect()
-	TweenService:Create(loadingText, TweenInfo.new(3), {
-		TextTransparency = 1
-	}):Play()
-	task.wait(3)
-	loadingScreen:Destroy()
-end)
 
 function DayYield:CreateWindow(config)
 	local window = {}
@@ -166,10 +81,15 @@ function DayYield:CreateWindow(config)
 	gui.Name = "DayYieldElden"
 	gui.Parent = PlayerGui
 	gui.ResetOnSpawn = false
-	gui.Enabled = false -- Initially hidden
 
-	-- Auto-scale the main frame
-	scaleUI(mainFrame)
+	-- Determine device type and adjust UI scale
+	local deviceType = UserInputService.TouchEnabled and "Mobile" or "Desktop"
+	print("Device Type: " .. deviceType)
+	local scaleFactor = deviceType == "Mobile" and 0.5 or 0.7
+
+	mainFrame.Name = "MainFrame"
+	mainFrame.Size = UDim2.new(0, 600 * scaleFactor, 0, 400 * scaleFactor)
+	mainFrame.Position = UDim2.new(0.5, -300 * scaleFactor, 0.5, -200 * scaleFactor)
 	mainFrame.BackgroundColor3 = DayYield.Style.BackgroundColor
 	mainFrame.Parent = gui
 
@@ -179,7 +99,7 @@ function DayYield:CreateWindow(config)
 	mainBorder.Parent = mainFrame
 
 	titleBar.Name = "TitleBar"
-	titleBar.Size = UDim2.new(1, 0, 0, 40)
+	titleBar.Size = UDim2.new(1, 0, 0, 30 * scaleFactor)
 	titleBar.BackgroundColor3 = DayYield.Style.SidebarColor
 	titleBar.Parent = mainFrame
 
@@ -187,50 +107,50 @@ function DayYield:CreateWindow(config)
 	titleText.Text = config.Title or "DayYield"
 	titleText.Font = Enum.Font.GothamBold
 	titleText.TextColor3 = DayYield.Style.GoldAccent
-	titleText.TextSize = 20
+	titleText.TextSize = 18 * scaleFactor
 	titleText.Size = UDim2.new(1, 0, 1, 0)
 	titleText.BackgroundTransparency = 1
 	titleText.Parent = titleBar
 
 	sidebar.Name = "Sidebar"
-	sidebar.Size = UDim2.new(0, 220, 1, -40)
-	sidebar.Position = UDim2.new(0, 0, 0, 40)
+	sidebar.Size = UDim2.new(0, 180 * scaleFactor, 1, -30 * scaleFactor)
+	sidebar.Position = UDim2.new(0, 0, 0, 30 * scaleFactor)
 	sidebar.BackgroundColor3 = DayYield.Style.SidebarColor
 	sidebar.Parent = mainFrame
 
 	decoration.Name = "Decoration"
-	decoration.Size = UDim2.new(1, 0, 0, 2)
+	decoration.Size = UDim2.new(1, 0, 0, 2 * scaleFactor)
 	decoration.Position = UDim2.new(0, 0, 0, 0)
 	decoration.BackgroundColor3 = DayYield.Style.GoldAccent
 	decoration.Parent = sidebar
 
 	local tabContainer = Instance.new("ScrollingFrame")
 	tabContainer.Name = "TabContainer"
-	tabContainer.Size = UDim2.new(1, -20, 1, -20)
-	tabContainer.Position = UDim2.new(0, 10, 0, 10)
+	tabContainer.Size = UDim2.new(1, -10 * scaleFactor, 1, -10 * scaleFactor)
+	tabContainer.Position = UDim2.new(0, 5 * scaleFactor, 0, 5 * scaleFactor)
 	tabContainer.BackgroundTransparency = 1
-	tabContainer.ScrollBarThickness = 2
+	tabContainer.ScrollBarThickness = 2 * scaleFactor
 	tabContainer.ScrollBarImageColor3 = DayYield.Style.GoldAccent
 	tabContainer.Parent = sidebar
 
 	local tabList = Instance.new("UIListLayout")
 	tabList.Parent = tabContainer
 	tabList.SortOrder = Enum.SortOrder.LayoutOrder
-	tabList.Padding = UDim.new(0, 8)
+	tabList.Padding = UDim.new(0, 5 * scaleFactor)
 
 	contentFrame.Name = "ContentFrame"
-	contentFrame.Size = UDim2.new(1, -240, 1, -60)
-	contentFrame.Position = UDim2.new(0, 230, 0, 50)
+	contentFrame.Size = UDim2.new(1, -190 * scaleFactor, 1, -40 * scaleFactor)
+	contentFrame.Position = UDim2.new(0, 180 * scaleFactor, 0, 40 * scaleFactor)
 	contentFrame.BackgroundTransparency = 1
 	contentFrame.Parent = mainFrame
 
 	local function createTabButton(name)
 		local button = Instance.new("TextButton")
-		button.Size = UDim2.new(1, 0, 0, 35)
+		button.Size = UDim2.new(1, 0, 0, 28 * scaleFactor)
 		button.BackgroundColor3 = DayYield.Style.ElementColor
 		button.Text = name
 		button.TextColor3 = DayYield.Style.TextColor
-		button.TextSize = 14
+		button.TextSize = 12 * scaleFactor
 		button.Font = Enum.Font.GothamSemibold
 
 		local buttonBorder = Instance.new("UIStroke")
@@ -239,12 +159,21 @@ function DayYield:CreateWindow(config)
 		buttonBorder.Parent = button
 
 		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0, 4)
+		corner.CornerRadius = UDim.new(0, 4 * scaleFactor)
 		corner.Parent = button
 
 		local padding = Instance.new("UIPadding")
-		padding.PaddingLeft = UDim.new(0, 15)
+		padding.PaddingLeft = UDim.new(0, 10 * scaleFactor)
 		padding.Parent = button
+
+		button.MouseButton1Click:Connect(function()
+			for _, child in pairs(contentFrame:GetChildren()) do
+				if child:IsA("ScrollingFrame") then
+					child.Visible = false
+				end
+			end
+			contentFrame:FindFirstChild(name .. "Content").Visible = true
+		end)
 
 		return button
 	end
@@ -259,7 +188,7 @@ function DayYield:CreateWindow(config)
 		tabContent.Name = name.."Content"
 		tabContent.Size = UDim2.new(1, 0, 1, 0)
 		tabContent.BackgroundTransparency = 1
-		tabContent.ScrollBarThickness = 2
+		tabContent.ScrollBarThickness = 2 * scaleFactor
 		tabContent.ScrollBarImageColor3 = DayYield.Style.GoldAccent
 		tabContent.Visible = false
 		tabContent.Parent = contentFrame
@@ -267,16 +196,16 @@ function DayYield:CreateWindow(config)
 		local elementList = Instance.new("UIListLayout")
 		elementList.Parent = tabContent
 		elementList.SortOrder = Enum.SortOrder.LayoutOrder
-		elementList.Padding = UDim.new(0, 10)
+		elementList.Padding = UDim.new(0, 5 * scaleFactor)
 
 		local function createButton(config)
 			local button = Instance.new("TextButton")
-			button.Size = UDim2.new(1, -20, 0, 40)
-			button.Position = UDim2.new(0, 10, 0, 0)
+			button.Size = UDim2.new(1, -10 * scaleFactor, 0, 32 * scaleFactor)
+			button.Position = UDim2.new(0, 5 * scaleFactor, 0, 0)
 			button.BackgroundColor3 = DayYield.Style.ElementColor
 			button.Text = config.Name
 			button.TextColor3 = DayYield.Style.TextColor
-			button.TextSize = 14
+			button.TextSize = 12 * scaleFactor
 			button.Font = Enum.Font.GothamSemibold
 
 			local buttonBorder = Instance.new("UIStroke")
@@ -285,17 +214,17 @@ function DayYield:CreateWindow(config)
 			buttonBorder.Parent = button
 
 			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0, 4)
+			corner.CornerRadius = UDim.new(0, 4 * scaleFactor)
 			corner.Parent = button
 
 			button.MouseEnter:Connect(function()
-				TweenService:Create(button, TweenInfo.new(0.2), {
+				TweenService:Create(button, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 					BackgroundColor3 = DayYield.Style.AccentColor
 				}):Play()
 			end)
 
 			button.MouseLeave:Connect(function()
-				TweenService:Create(button, TweenInfo.new(0.2), {
+				TweenService:Create(button, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 					BackgroundColor3 = DayYield.Style.ElementColor
 				}):Play()
 			end)
@@ -303,23 +232,15 @@ function DayYield:CreateWindow(config)
 			return button
 		end
 
-		function tab:CreateButton(config)
-			local button = createButton(config)
-			button.Parent = tabContent
-
-			button.MouseButton1Click:Connect(function()
-				config.Callback()
-			end)
-		end
-
-		function tab:CreateToggle(config)
+		local function createToggle(config)
 			local toggleButton = createButton(config)
+			toggleButton.Text = config.Name
 			toggleButton.Parent = tabContent
 
 			local toggleState = false
 			local indicator = Instance.new("Frame")
-			indicator.Size = UDim2.new(0, 20, 0, 20)
-			indicator.Position = UDim2.new(1, -30, 0.5, -10)
+			indicator.Size = UDim2.new(0, 16 * scaleFactor, 0, 16 * scaleFactor)
+			indicator.Position = UDim2.new(1, -25 * scaleFactor, 0.5, -8 * scaleFactor)
 			indicator.BackgroundColor3 = DayYield.Style.ElementColor
 			indicator.Parent = toggleButton
 
@@ -328,30 +249,110 @@ function DayYield:CreateWindow(config)
 			indicatorBorder.Thickness = 1
 			indicatorBorder.Parent = indicator
 
-			Instance.new("UICorner", indicator).CornerRadius = UDim.new(0, 4)
+			Instance.new("UICorner", indicator).CornerRadius = UDim.new(0, 4 * scaleFactor)
 
 			toggleButton.MouseButton1Click:Connect(function()
 				toggleState = not toggleState
 				local targetColor = toggleState and DayYield.Style.GoldAccent or DayYield.Style.ElementColor
-				TweenService:Create(indicator, TweenInfo.new(0.2), {
+				TweenService:Create(indicator, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 					BackgroundColor3 = targetColor
 				}):Play()
 				config.Callback(toggleState)
 			end)
+
+			return toggleButton
 		end
 
-		tabButton.MouseButton1Click:Connect(function()
-			for _, child in ipairs(contentFrame:GetChildren()) do
-				if child:IsA("ScrollingFrame") then
-					child.Visible = false
+		local function createSlider(config)
+			local sliderFrame = Instance.new("Frame")
+			sliderFrame.Size = UDim2.new(1, -10 * scaleFactor, 0, 50 * scaleFactor)
+			sliderFrame.Position = UDim2.new(0, 5 * scaleFactor, 0, 0)
+			sliderFrame.BackgroundColor3 = DayYield.Style.ElementColor
+			sliderFrame.Parent = tabContent
+
+			local sliderBorder = Instance.new("UIStroke")
+			sliderBorder.Color = DayYield.Style.BorderColor
+			sliderBorder.Thickness = 1
+			sliderBorder.Parent = sliderFrame
+
+			local sliderLabel = Instance.new("TextLabel")
+			sliderLabel.Size = UDim2.new(0, 100 * scaleFactor, 0, 20 * scaleFactor)
+			sliderLabel.Position = UDim2.new(0, 5 * scaleFactor, 0, 0)
+			sliderLabel.BackgroundTransparency = 1
+			sliderLabel.Text = config.Name
+			sliderLabel.TextColor3 = DayYield.Style.TextColor
+			sliderLabel.TextSize = 12 * scaleFactor
+			sliderLabel.Font = Enum.Font.GothamSemibold
+			sliderLabel.Parent = sliderFrame
+
+			local sliderBar = Instance.new("Frame")
+			sliderBar.Size = UDim2.new(1, -110 * scaleFactor, 0, 4 * scaleFactor)
+			sliderBar.Position = UDim2.new(0, 105 * scaleFactor, 0.5, -2 * scaleFactor)
+			sliderBar.BackgroundColor3 = DayYield.Style.SidebarColor
+			sliderBar.Parent = sliderFrame
+
+			local sliderButton = Instance.new("Frame")
+			sliderButton.Size = UDim2.new(0, 10 * scaleFactor, 0, 10 * scaleFactor)
+			sliderButton.Position = UDim2.new(0.5, -5 * scaleFactor, 0.5, -5 * scaleFactor)
+			sliderButton.BackgroundColor3 = DayYield.Style.GoldAccent
+			sliderButton.Parent = sliderBar
+
+			local sliderValueLabel = Instance.new("TextLabel")
+			sliderValueLabel.Size = UDim2.new(0, 50 * scaleFactor, 0, 20 * scaleFactor)
+			sliderValueLabel.Position = UDim2.new(1, 5 * scaleFactor, 0, 0)
+			sliderValueLabel.BackgroundTransparency = 1
+			sliderValueLabel.Text = tostring(config.Min)
+			sliderValueLabel.TextColor3 = DayYield.Style.TextColor
+			sliderValueLabel.TextSize = 12 * scaleFactor
+			sliderValueLabel.Font = Enum.Font.GothamSemibold
+			sliderValueLabel.Parent = sliderFrame
+
+			local dragging = false
+
+			sliderButton.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					dragging = true
 				end
-			end
-			tabContent.Visible = true
-		end)
+			end)
+
+			sliderButton.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					dragging = false
+				end
+			end)
+
+			UserInputService.InputChanged:Connect(function(input)
+				if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+					local x = math.clamp(input.Position.X - sliderBar.AbsolutePosition.X, 0, sliderBar.AbsoluteSize.X)
+					local value = math.clamp(x / sliderBar.AbsoluteSize.X, 0, 1) * (config.Max - config.Min) + config.Min
+					sliderButton.Position = UDim2.new(x / sliderBar.AbsoluteSize.X, -5 * scaleFactor, 0.5, -5 * scaleFactor)
+					sliderValueLabel.Text = tostring(math.floor(value))
+					config.Callback(value)
+				end
+			end)
+
+			return sliderFrame
+		end
+
+		function tab:CreateButton(config)
+			local button = createButton(config)
+			button.Parent = tabContent
+		end
+
+		function tab:CreateToggle(config)
+			local toggle = createToggle(config)
+			toggle.Parent = tabContent
+		end
+
+		function tab:CreateSlider(config)
+			local slider = createSlider(config)
+			slider.Parent = tabContent
+		end
 
 		return tab
 	end
 
+	-- Make window draggable
 	local dragging, dragInput, dragStart, startPos
 
 	titleBar.InputBegan:Connect(function(input)
@@ -375,18 +376,31 @@ function DayYield:CreateWindow(config)
 		end
 	end)
 
-	Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
-	Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 8)
-	Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 8)
+	Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8 * scaleFactor)
+	Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 8 * scaleFactor)
+	Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 8 * scaleFactor)
 
-	-- Keybind (K) to toggle UI
-	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if input.KeyCode == Enum.KeyCode.K then
-			gui.Enabled = not gui.Enabled
-			TweenService:Create(mainFrame, TweenInfo.new(0.3), {
-				Position = gui.Enabled and UDim2.new(0.3, 0, 0.2, 0) or UDim2.new(0.3, 0, -1, 0)
-			}):Play()
+	-- Fade to close and open interface with right shift
+	local function fadeOut()
+		TweenService:Create(gui, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {ResetOnSpawn = false, Enabled = false}):Play()
+	end
+
+	local function fadeIn()
+		gui.Enabled = true
+		TweenService:Create(gui, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {ResetOnSpawn = true, Enabled = true}):Play()
+	end
+
+	local function toggleGui()
+		if gui.Enabled then
+			fadeOut()
+		else
+			fadeIn()
+		end
+	end
+
+	UserInputService.InputBegan:Connect(function(input)
+		if input.KeyCode == Enum.KeyCode.RightShift then
+			toggleGui()
 		end
 	end)
 
